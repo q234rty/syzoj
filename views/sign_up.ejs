@@ -62,7 +62,8 @@ function submit() {
           username: $("#username").val(),
           password: password,
           email: $("#email").val(),
-          prevUrl: <%- JSON.stringify(req.query.url || '/') %>
+          prevUrl: <%- JSON.stringify(req.query.url || '/') %>,
+          _csrf: document.head.getAttribute('data-csrf-token')
         },
         success: function(data) {
             error_code = data.error_code;
@@ -89,7 +90,7 @@ function submit() {
                     show_error("邮箱地址已被占用");
                     break;
                 case 2010:
-                    show_error("验证邮件发送失败");
+                    show_error("验证邮件发送失败：\n" + data.message);
                     break;
                 case 1:
                     success();
@@ -98,7 +99,7 @@ function submit() {
                     mail_required();
                     break;
                 default:
-                    show_error("未知错误");
+                    show_error("未知错误：" + JSON.stringify(data));
                     break;
             }
             $("#sign_up").removeClass("loading");

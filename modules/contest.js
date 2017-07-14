@@ -149,7 +149,7 @@ app.get('/contest/:id', async (req, res) => {
             let judge_state = await JudgeState.fromID(player.score_details[problem.problem.id].judge_id);
             problem.status = judge_state.status;
             if (!contest.ended && !await problem.problem.isAllowedEditBy(res.locals.user) && !['Compile Error', 'Waiting', 'Compiling'].includes(problem.status)) {
-              problem.status = 'Compiled';
+              problem.status = 'Submitted';
             }
             problem.judge_id = player.score_details[problem.problem.id].judge_id;
           }
@@ -306,7 +306,7 @@ app.get('/contest/:id/submissions', async (req, res) => {
 
       if (contest.type === 'noi' && !contest.ended && !await obj.problem.isAllowedEditBy(res.locals.user)) {
         if (!['Compile Error', 'Waiting', 'Compiling'].includes(obj.status)) {
-          obj.status = 'Compiled';
+          obj.status = 'Submitted';
         }
       }
     });
@@ -329,9 +329,7 @@ app.get('/contest/:id/:pid', async (req, res) => {
   try {
     let contest_id = parseInt(req.params.id);
     let contest = await Contest.fromID(contest_id);
-
-    contest.ended = await contest.isEnded();
-    if (!(await contest.isRunning() || contest.ended)) throw new ErrorMessage('比赛尚未开始或已结束。');
+    if (!contest) throw new ErrorMessage('无此比赛。');
 
     let problems_id = await contest.getProblems();
 
@@ -341,12 +339,22 @@ app.get('/contest/:id/:pid', async (req, res) => {
     let problem_id = problems_id[pid - 1];
     let problem = await Problem.fromID(problem_id);
 
+    contest.ended = await contest.isEnded();
+    if (!(await contest.isRunning() || contest.ended)) {
+      if (await problem.isAllowedUseBy(res.locals.user)) {
+        return res.redirect(syzoj.utils.makeUrl(['problem', problem_id]));
+      }
+      throw new ErrorMessage('比赛尚未开始。');
+    }
+
     problem.specialJudge = await problem.hasSpecialJudge();
 
     await syzoj.utils.markdown(problem, [ 'description', 'input_format', 'output_format', 'example', 'limit_and_hint' ]);
 
     let state = await problem.getJudgeState(res.locals.user, false);
     let testcases = await syzoj.utils.parseTestdata(problem.getTestdataPath(), problem.type === 'submit-answer');
+
+    await problem.loadRelationships();
 
     res.render('problem', {
       pid: pid,
@@ -358,6 +366,43 @@ app.get('/contest/:id/:pid', async (req, res) => {
     });
   } catch (e) {
     syzoj.log(e);
+    res.render('error', {
+      err: e
+    });
+  }
+});
+
+app.get('/contest/:id/:pid/download/additional_file', async (req, res) => {
+  try {
+    let id = parseInt(req.params.id);
+    let contest = await Contest.fromID(id);
+    if (!contest) throw new ErrorMessage('无此比赛。');
+
+    let problems_id = await contest.getProblems();
+
+    let pid = parseInt(req.params.pid);
+    if (!pid || pid < 1 || pid > problems_id.length) throw new ErrorMessage('无此题目。');
+
+    let problem_id = problems_id[pid - 1];
+    let problem = await Problem.fromID(problem_id);
+
+    contest.ended = await contest.isEnded();
+    if (!(await contest.isRunning() || contest.ended)) {
+      if (await problem.isAllowedUseBy(res.locals.user)) {
+        return res.redirect(syzoj.utils.makeUrl(['problem', problem_id, 'download', 'additional_file']));
+      }
+      throw new ErrorMessage('比赛尚未开始。');
+    }
+
+    await problem.loadRelationships();
+
+    if (!problem.additional_file) throw new ErrorMessage('无附加文件。');
+
+    console.log(`additional_file_${id}_${pid}.zip`);
+    res.download(problem.additional_file.getPath(), `additional_file_${id}_${pid}.zip`);
+  } catch (e) {
+    syzoj.log(e);
+    res.status(404);
     res.render('error', {
       err: e
     });

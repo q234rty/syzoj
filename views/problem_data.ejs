@@ -95,7 +95,7 @@ function getIcon(filename) {
                         <i class="remove icon"></i>
                         否
                       </div>
-                      <a class="ui green ok inverted button" href="<%= syzoj.utils.makeUrl(['problem', problem.id, 'testdata', 'delete', file.filename]) %>">
+                      <a class="ui green ok inverted button" href-post="<%= syzoj.utils.makeUrl(['problem', problem.id, 'testdata', 'delete', file.filename]) %>">
                         <i class="checkmark icon"></i>
                         是
                       </a>
@@ -146,7 +146,7 @@ function getIcon(filename) {
         <script>
         function check_replace() {
           var old_files = <%- JSON.stringify((testdata && testdata.files ? testdata.files : []).map(x => x.filename)) %>;
-          var replaced_files = Array.from($('#upload_file')[0].files).map(function (x) { return x.name; }).filter(function (x) { return old_files.includes(x); });
+          var replaced_files = Array.prototype.slice.call($('#upload_file')[0].files).map(function (x) { return x.name; }).filter(function (x) { return old_files.includes(x); });
           var s = '';
           for (let file of replaced_files) s += '<samp>' + file + '</samp><br>';
           if (s) {
